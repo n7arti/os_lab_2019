@@ -99,7 +99,8 @@ int main(int argc, char **argv) {
 
   struct timeval start_time;
   gettimeofday(&start_time, NULL);
-
+    int pipef[2];
+    pipe(pipef);
   for (int i = 0; i < pnum; i++) {
     pid_t child_pid = fork();
     if (child_pid >= 0) {
@@ -115,10 +116,10 @@ int main(int argc, char **argv) {
             min_max = GetMinMax(array, i*array_size/pnum, array_size);
         if (with_files) {
           // use files here
-          FILE * fp;
+          FILE* fp;
           fp = fopen("file.txt", "a");
-          if (fp == 0){
-              printf("Could not open file")
+          if (fp == 0) {
+              printf("Could not open file");
               return 1;
           }
           else 
@@ -126,6 +127,7 @@ int main(int argc, char **argv) {
           fclose(fp);
         } else {
           // use pipe here
+          write(pipef[1],&min_max,sizeof(struct MinMax));
         }
         return 0;
       }
@@ -138,7 +140,8 @@ int main(int argc, char **argv) {
 
   while (active_child_processes > 0) {
     // your code here
-
+    close(pipef[1]);
+    wait(NULL);
     active_child_processes -= 1;
   }
 
@@ -149,11 +152,21 @@ int main(int argc, char **argv) {
   for (int i = 0; i < pnum; i++) {
     int min = INT_MAX;
     int max = INT_MIN;
-
     if (with_files) {
       // read from files
+      FILE* fp = fopen("file.txt", "r");
+      if (fp ==0){
+            printf("Could not open file");
+            return 1;
+      }
+      else {
+          fseek(fp, i*sizeof(struct MinMax), SEEK_SET);
+          fread(&min_max, sizeof(struct MinMax), 1, fp);
+      }
+      fclose(fp);
     } else {
       // read from pipes
+      read(pipef[0],&min_max,sizeof(struct MinMax));
     }
 
     if (min < min_max.min) min_max.min = min;
