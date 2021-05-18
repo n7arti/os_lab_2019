@@ -19,10 +19,14 @@ struct FactArgs {
 int thread_factorial(struct FactArgs *args)
 {
     int fact = 1;
+    printf("%d beginfunc\n",args->begin);
+    printf("%d endfunc\n",args->end);
+    pthread_mutex_lock(&mut);
   for (int i = args->begin; i < args->end+1; i++){
       fact *= i%args->mod;
-      printf("%d func\n",i );
+      printf("%d func\n", fact );
   }
+    pthread_mutex_unlock(&mut);
   return fact;
 }
 int main(int argc, char **argv) {
@@ -91,8 +95,8 @@ int main(int argc, char **argv) {
         return 1;
     }
     struct FactArgs args[pnum];
-    
     pthread_t thread[pnum];
+
     for (int i=0;i<pnum;i++){  
         args[i].mod=mod; 
         if(i == 0)
@@ -119,9 +123,12 @@ int main(int argc, char **argv) {
     int fact = 1;
   for (int i = 0; i < pnum; i++) {
     pthread_join(thread[i], (void *)&fact);
+    pthread_mutex_lock(&mut);
     printf("%d fact\n",fact);
-    total_fact *= fact%mod;
+    total_fact *= fact %mod;
+    printf("%d total_fact\n",total_fact);
+    pthread_mutex_unlock(&mut);
   }
-  printf("%d\n", total_fact);
+  printf("Total: %d \n", total_fact);
 
 }
