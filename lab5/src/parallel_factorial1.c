@@ -5,34 +5,35 @@
 #include <stdbool.h>
 #include <getopt.h>
 #include <unistd.h>
+#include <errno.h>
+#include <stdint.h>
 
 pthread_mutex_t mut = PTHREAD_MUTEX_INITIALIZER;
-
+uint32_t total_fact = 1;
 
 struct FactArgs {
-  int begin;
-  int end;
-  int mod;
+  u_int32_t* fact;
+  u_int32_t begin, end, mod;
 };
 
 
-int thread_factorial(struct FactArgs *args)
+int thread_factorial(void *args)
 {
-    int fact = 1;
-    printf("%d beginfunc\n",args->begin);
-    printf("%d endfunc\n",args->end);
-    pthread_mutex_lock(&mut);
-  for (int i = args->begin; i < args->end+1; i++){
-      fact *= i%args->mod;
-      printf("%d func\n", fact );
-  }
-    pthread_mutex_unlock(&mut);
-  return fact;
+    struct FactArgs *d = (struct FactArgs *)args;
+    for (int i = d->begin; i < d->end; i++)
+    {
+        pthread_mutex_lock(&mut);
+        *(d->fact) *= i;
+        *(d->fact) %= d->mod;
+        pthread_mutex_unlock(&mut);
+        
+    }
 }
+
 int main(int argc, char **argv) {
-  int k = -1;
-  int mod = -1;
-  int pnum = -1;
+  u_int32_t k = -1;
+  u_int32_t mod = -1;
+  u_int32_t pnum = -1;
   while (true) {
         int current_optind = optind ? optind : 1;
 
@@ -42,7 +43,7 @@ int main(int argc, char **argv) {
                                         {0, 0, 0, 0}};
 
         int option_index = 0;
-        int c = getopt_long(argc, argv, "f", options, &option_index);
+        int c = getopt_long(argc, argv, "", options, &option_index);
 
         if (c == -1) break;
 
@@ -98,37 +99,24 @@ int main(int argc, char **argv) {
     pthread_t thread[pnum];
 
     for (int i=0;i<pnum;i++){  
-        args[i].mod=mod; 
-        if(i == 0)
-        args[i].begin = i+1;
-        else {
-        args[i].begin = (i*k/pnum)+1;
-        }
-      if(i == (pnum-1))
-        args[i].end = k;
-      else 
-        args[i].end = (k/pnum)*(i+1);
-        printf("%d begin \n",args[i].begin);
-        printf("%d end \n",args[i].end);
+      args[i].fact = &total_fact;
+      args[i].begin = i * k / pnum + 1;
+      args[i].end = (i == (pnum - 1) ) ? k + 1 : (i + 1) * k / pnum + 1;
+      args[i].mod = mod;
     }
     for(int i = 0; i < pnum; i++) {
         
-        if (pthread_create(&thread[i], NULL, (void *)thread_factorial, (void *)&args[i]) != 0){
+        if (pthread_create(&thread[i], NULL, (void *)thread_factorial, (void *)&args[i])){
             perror("pthread_create");
             exit(1);
         }
         
     }
-    int total_fact = 1;
-    int fact = 1;
-  for (int i = 0; i < pnum; i++) {
-    pthread_join(thread[i], (void *)&fact);
-    pthread_mutex_lock(&mut);
-    printf("%d fact\n",fact);
-    total_fact *= fact %mod;
-    printf("%d total_fact\n",total_fact);
-    pthread_mutex_unlock(&mut);
-  }
+     for (int i = 0; i < pnum; i++)
+      if (pthread_join(thread[i], NULL) != 0) {
+        perror("pthread_join");
+        exit(1);
+      }
   printf("Total: %d \n", total_fact);
 
 }
